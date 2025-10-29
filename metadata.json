@@ -1,0 +1,7 @@
+{
+  "name": "Udaya Public School Management Portal",
+  "description": "A comprehensive portal for managing school operations, including user management, fee collection, attendance tracking, and student/teacher access via QR codes.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

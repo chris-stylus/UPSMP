@@ -6,7 +6,7 @@ import QrScanner from '../shared/QrScanner';
 type FeeCollectionView = 'scan' | 'form' | 'daybook';
 
 const FeeCollection: React.FC = () => {
-    const { users, transactions, setTransactions, showAlert } = useAppContext();
+    const { users, transactions, addTransaction, showAlert } = useAppContext();
     const [view, setView] = useState<FeeCollectionView>('scan');
     const [scannedStudent, setScannedStudent] = useState<User | null>(null);
     const [amount, setAmount] = useState('');
@@ -23,7 +23,7 @@ const FeeCollection: React.FC = () => {
         }
     };
     
-    const handleRecordPayment = () => {
+    const handleRecordPayment = async () => {
         if (!scannedStudent || !amount || !paymentMethod) {
             showAlert('Please fill all fields.', 'Invalid Input');
             return;
@@ -34,8 +34,7 @@ const FeeCollection: React.FC = () => {
             return;
         }
 
-        const newTransaction: Transaction = {
-            id: `t${Date.now()}`,
+        const newTransaction: Omit<Transaction, 'id'> = {
             qr_id: scannedStudent.qr_id,
             student_name: scannedStudent.name,
             type: 'Fee Payment',
@@ -43,13 +42,18 @@ const FeeCollection: React.FC = () => {
             payment_method: paymentMethod,
             date: new Date().toISOString(),
         };
-
-        setTransactions(prev => [newTransaction, ...prev]);
-        showAlert(`Payment of ₹${numAmount.toLocaleString('en-IN')} recorded for ${scannedStudent.name}.`, 'Success', false);
-        setScannedStudent(null);
-        setAmount('');
-        setPaymentMethod('');
-        setView('daybook');
+        
+        try {
+            await addTransaction(newTransaction);
+            showAlert(`Payment of ₹${numAmount.toLocaleString('en-IN')} recorded for ${scannedStudent.name}.`, 'Success', false);
+            setScannedStudent(null);
+            setAmount('');
+            setPaymentMethod('');
+            setView('daybook');
+        } catch (error) {
+            console.error("Error recording payment: ", error);
+            showAlert("Failed to record payment. Please try again.", "Database Error");
+        }
     };
 
     const resetAndScan = () => {

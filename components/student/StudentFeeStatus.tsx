@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 const StudentFeeStatus: React.FC = () => {
     const { loggedInUser, transactions, feeStructure } = useAppContext();
 
-    if (!loggedInUser) return null;
+    if (!loggedInUser || !feeStructure) return <div className="text-center p-4">Loading financial data...</div>;
 
     const studentPayments = transactions.filter(t => t.qr_id === loggedInUser.qr_id && t.type === 'Fee Payment');
     const totalPaid = studentPayments.reduce((sum, t) => sum + t.amount, 0);

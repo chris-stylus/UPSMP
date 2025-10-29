@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { FeeStructure } from '../../types';
 
 const FeesSetup: React.FC = () => {
-    const { feeStructure, setFeeStructure, showAlert } = useAppContext();
-    const [fees, setFees] = useState<FeeStructure>(feeStructure);
+    const { feeStructure, saveFeeStructure, showAlert } = useAppContext();
+    const [fees, setFees] = useState<FeeStructure>({ annual_tuition: 0, library_fee: 0, sports_fee: 0 });
 
-    const handleSave = () => {
+    useEffect(() => {
+        if (feeStructure) {
+            setFees(feeStructure);
+        }
+    }, [feeStructure]);
+
+    const handleSave = async () => {
         const tuition = Number(fees.annual_tuition);
         const library = Number(fees.library_fee);
         const sports = Number(fees.sports_fee);
@@ -16,14 +22,23 @@ const FeesSetup: React.FC = () => {
             return;
         }
 
-        setFeeStructure(fees);
-        showAlert('Fees structure updated successfully!', 'Success', false);
+        try {
+            await saveFeeStructure(fees);
+            showAlert('Fees structure updated successfully!', 'Success', false);
+        } catch (error) {
+            console.error("Error saving fees: ", error);
+            showAlert("Failed to save fees. Please try again.", "Database Error");
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFees(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
     };
+
+    if (!feeStructure) {
+        return <div className="text-center p-4">Loading fee structure...</div>
+    }
 
     return (
         <div className="p-6 bg-white dark:bg-gray-700 rounded-xl shadow-lg">

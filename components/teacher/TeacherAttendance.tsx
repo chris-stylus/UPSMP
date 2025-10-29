@@ -4,7 +4,7 @@ import { TEACHER_CLASS_MAPPING } from '../../constants';
 import { AttendanceRecord } from '../../types';
 
 const TeacherAttendance: React.FC = () => {
-    const { loggedInUser, users, attendance, setAttendance, showAlert } = useAppContext();
+    const { loggedInUser, users, attendance, saveAttendance, showAlert } = useAppContext();
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     const classInfo = loggedInUser ? TEACHER_CLASS_MAPPING[loggedInUser.qr_id] : null;
@@ -37,7 +37,7 @@ const TeacherAttendance: React.FC = () => {
         setStudentStatuses(prev => ({ ...prev, [qr_id]: status }));
     };
 
-    const handleSaveAttendance = () => {
+    const handleSaveAttendance = async () => {
         if (!loggedInUser || !classInfo) return showAlert('Cannot save attendance: teacher or class info missing.', 'Error');
         
         const recordsToSave = Object.entries(studentStatuses)
@@ -49,7 +49,7 @@ const TeacherAttendance: React.FC = () => {
                     student_qr_id: qr_id,
                     student_name: student?.name || 'Unknown',
                     date: selectedDate,
-                    status,
+                    status: status as 'P' | 'A',
                     teacher_id: loggedInUser.qr_id,
                     class: classInfo.class,
                     section: classInfo.section,
@@ -60,12 +60,13 @@ const TeacherAttendance: React.FC = () => {
             return showAlert('No attendance status selected to save.', 'Info', false);
         }
 
-        setAttendance(prev => {
-            const otherDaysAttendance = prev.filter(a => a.date !== selectedDate);
-            return [...otherDaysAttendance, ...recordsToSave];
-        });
-
-        showAlert(`Attendance saved for ${recordsToSave.length} students on ${selectedDate}.`, 'Success', false);
+        try {
+            await saveAttendance(recordsToSave);
+            showAlert(`Attendance saved for ${recordsToSave.length} students on ${selectedDate}.`, 'Success', false);
+        } catch (error) {
+            console.error("Error saving attendance: ", error);
+            showAlert("Failed to save attendance. Please try again.", "Database Error");
+        }
     };
 
 

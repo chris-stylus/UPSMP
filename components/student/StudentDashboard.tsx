@@ -33,7 +33,7 @@ const DashboardHome: React.FC<{ loggedInUser: User }> = ({ loggedInUser }) => {
     // Fee Status Summary
     const studentPayments = transactions.filter(t => t.qr_id === loggedInUser.qr_id && t.type === 'Fee Payment');
     const totalPaid = studentPayments.reduce((sum, t) => sum + t.amount, 0);
-    const totalDue = feeStructure.annual_tuition + feeStructure.library_fee + feeStructure.sports_fee;
+    const totalDue = feeStructure ? feeStructure.annual_tuition + feeStructure.library_fee + feeStructure.sports_fee : 0;
     const outstandingBalance = Math.max(0, totalDue - totalPaid);
     const feeStatusText = outstandingBalance > 0 ? 'Payment Pending' : 'Cleared';
     const feeStatusColor = outstandingBalance > 0 ? 'text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-500/20' : 'text-green-700 bg-green-100 dark:text-green-200 dark:bg-green-500/20';

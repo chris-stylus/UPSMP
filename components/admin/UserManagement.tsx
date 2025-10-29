@@ -3,7 +3,7 @@ import { useAppContext } from '../../context/AppContext';
 import { User } from '../../types';
 
 const UserManagement: React.FC = () => {
-    const { users, setUsers, showAlert } = useAppContext();
+    const { users, addUser, addBulkUsers, deleteUser, showAlert } = useAppContext();
     const [name, setName] = useState('');
     const [role, setRole] = useState<'Student' | 'Teacher' | ''>('');
     const [userClass, setUserClass] = useState('');
@@ -15,27 +15,40 @@ const UserManagement: React.FC = () => {
         return `UDS-${prefix}-${String(roleUsersCount + 1).padStart(3, '0')}`;
     };
 
-    const handleSaveUser = () => {
+    const handleSaveUser = async () => {
         if (!name || !role) return showAlert('Please fill in Name and select a Role.', 'Invalid Input');
         if (role === 'Student' && (!userClass || !section)) return showAlert('Students require a Class and Section.', 'Invalid Input');
 
-        const newUser: User = {
-            id: `u${Date.now()}`,
-            qr_id: generateQRId(role),
+        const qr_id = generateQRId(role);
+        const newUser: Omit<User, 'id'> = {
+            qr_id,
             name,
             role,
             class: role === 'Student' ? userClass : undefined,
             section: role === 'Student' ? section.toUpperCase() : undefined,
         };
-        setUsers(prev => [...prev, newUser]);
-        showAlert(`User ${name} added! QR ID: ${newUser.qr_id}`, 'User Created', false);
-        // Reset form
-        setName(''); setRole(''); setUserClass(''); setSection('');
+        
+        try {
+            await addUser(newUser);
+            showAlert(`User ${name} added! QR ID: ${qr_id}`, 'User Created', false);
+            // Reset form
+            setName(''); setRole(''); setUserClass(''); setSection('');
+        } catch (error) {
+            console.error("Error saving user: ", error);
+            showAlert("Failed to save user. Please try again.", "Database Error");
+        }
     };
 
-    const handleDeleteUser = (id: string) => {
-        setUsers(prev => prev.filter(u => u.id !== id));
-        showAlert('User deleted successfully.', 'Success', false);
+    const handleDeleteUser = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this user?")) {
+            try {
+                await deleteUser(id);
+                showAlert('User deleted successfully.', 'Success', false);
+            } catch (error) {
+                console.error("Error deleting user: ", error);
+                showAlert("Failed to delete user. Please try again.", "Database Error");
+            }
+        }
     };
 
     const handleBulkImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,10 +56,10 @@ const UserManagement: React.FC = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             const text = e.target?.result as string;
             const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-            const newStudents: User[] = [];
+            const newStudents: Omit<User, 'id'>[] = [];
             
             lines.forEach((line, index) => {
                 const parts = line.split(',').map(p => p.trim());
@@ -55,7 +68,6 @@ const UserManagement: React.FC = () => {
                     const studentRole = 'Student';
                     const qr_id = `UDS-S-${String(users.filter(u => u.role === studentRole).length + index + 1).padStart(3, '0')}`;
                     newStudents.push({
-                        id: `bulk-${Date.now()}-${index}`,
                         qr_id,
                         name: studentName,
                         role: studentRole,
@@ -66,8 +78,13 @@ const UserManagement: React.FC = () => {
             });
 
             if (newStudents.length > 0) {
-                setUsers(prev => [...prev, ...newStudents]);
-                showAlert(`Successfully imported ${newStudents.length} students.`, 'Bulk Import Complete', false);
+                try {
+                    await addBulkUsers(newStudents);
+                    showAlert(`Successfully imported ${newStudents.length} students.`, 'Bulk Import Complete', false);
+                } catch (error) {
+                    console.error("Error bulk importing: ", error);
+                    showAlert("Failed to import students. Please try again.", "Database Error");
+                }
             } else {
                  showAlert('No valid student data found in CSV. Format: Name,Class,Section (no header).', 'Import Failed');
             }

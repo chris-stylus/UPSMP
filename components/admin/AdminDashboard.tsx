@@ -38,7 +38,7 @@ const AdminNav: React.FC<{ activeView: AdminView, setActiveView: (view: AdminVie
 const DashboardHome: React.FC = () => {
     const { users, feeStructure } = useAppContext();
     const studentCount = users.filter(u => u.role === 'Student').length;
-    const totalAnnualFee = feeStructure.annual_tuition + feeStructure.library_fee + feeStructure.sports_fee;
+    const totalAnnualFee = feeStructure ? feeStructure.annual_tuition + feeStructure.library_fee + feeStructure.sports_fee : 0;
 
     return (
         <>

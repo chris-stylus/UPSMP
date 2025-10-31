@@ -5,23 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Udaya Public School Management Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Set dark mode strategy for Tailwind CDN
+        tailwind.config = {
+            darkMode: 'class'
+        }
+
+        // Apply theme before React loads to prevent flicker
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- External Libraries MUST be loaded before the module script -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script> 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        html.dark {
+            color-scheme: dark;
+        }
         body {
             font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         .main-card {
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
+        .dark .main-card {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .printable-area, .printable-area * {
+                visibility: visible;
+            }
+            .printable-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
     </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-900">
+<body class="min-h-screen p-4 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
     <div id="root" class="w-full"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

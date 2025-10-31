@@ -18,7 +18,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
 
         let isCancelled = false;
         
-        const startScanner = async () => {
+        const startScanner = () => {
             if (typeof Html5Qrcode === 'undefined') {
                 setStatus('QR Scanner Library loading...');
                 setTimeout(startScanner, 100);
@@ -26,27 +26,17 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
             }
 
             if (isCancelled) return;
-            
-            setStatus('Requesting camera access...');
-            try {
-                await navigator.mediaDevices.getUserMedia({ video: true });
-            } catch (err: any) {
-                console.error("Camera permission error:", err);
-                setStatus('Camera permission denied.');
-                if(onScanFailure) onScanFailure("Camera permission denied.");
-                return;
-            }
 
-            if (isCancelled) return;
-
-            const html5QrCode = new Html5Qrcode(qrReaderRef.current.id, false);
+            // The library handles permission requests internally. Let it do its job.
+            const html5QrCode = new Html5Qrcode(qrReaderRef.current.id, /* verbose= */ false);
             scannerInstanceRef.current = html5QrCode;
 
-            setStatus('Starting camera...');
+            setStatus('Initializing camera...');
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText: string, decodedResult: any) => {
+                    // success callback
                     if (scannerInstanceRef.current) {
                         scannerInstanceRef.current.stop().catch(console.warn);
                         scannerInstanceRef.current = null;
@@ -54,14 +44,26 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
                     }
                 },
                 (errorMessage: string) => {
-                    // console.warn(`QR Code no match: ${errorMessage}`);
+                    // This callback is for when a QR code is not found, not for errors. Ignore it.
                 }
             ).then(() => {
-                if(!isCancelled) setStatus('Camera ready. Point at QR code.');
+                if (!isCancelled) setStatus('Camera ready. Point at QR code.');
             }).catch((err: any) => {
+                if (isCancelled) return; // Don't show error if component unmounted.
+
                 console.error("Scanner failed to start:", err);
-                setStatus('Failed to start camera.');
-                if (onScanFailure) onScanFailure('Failed to start camera.');
+                let errorMessage = 'Failed to start camera.';
+                // The library throws specific error names for permission issues.
+                if (String(err).includes('NotAllowedError') || String(err).includes('Permission denied')) {
+                    errorMessage = 'Camera permission denied.';
+                } else if (String(err).includes('NotFoundError')) {
+                     errorMessage = 'No camera found.';
+                }
+                
+                setStatus(errorMessage);
+                if (onScanFailure) {
+                    onScanFailure(errorMessage);
+                }
             });
         };
 

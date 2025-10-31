@@ -1,44 +1,53 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import { TEACHER_CLASS_MAPPING } from '../../constants';
 import { AttendanceRecord } from '../../types';
 
 const TeacherAttendance: React.FC = () => {
-    const { loggedInUser, users, attendance, saveAttendance, showAlert } = useAppContext();
+    const { loggedInUser, users, attendance, setAttendance, showAlert, teacherSubjects } = useAppContext();
+    
+    const assignedClassSections = useMemo(() => {
+        if (!loggedInUser) return [];
+        const assignments = teacherSubjects.filter(ts => ts.teacher_qr_id === loggedInUser.qr_id);
+        // Create unique class-section identifiers
+        const uniqueClassSections = [...new Set(assignments.map(a => `${a.class}-${a.section}`))];
+        return uniqueClassSections.map(cs => {
+            const [cls, sec] = cs.split('-');
+            return { class: cls, section: sec };
+        });
+    }, [loggedInUser, teacherSubjects]);
+
+    const [selectedClassSection, setSelectedClassSection] = useState(assignedClassSections[0] ? `${assignedClassSections[0].class}-${assignedClassSections[0].section}` : '');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const classInfo = loggedInUser ? TEACHER_CLASS_MAPPING[loggedInUser.qr_id] : null;
+    const currentClassInfo = useMemo(() => {
+        if (!selectedClassSection) return null;
+        const [cls, sec] = selectedClassSection.split('-');
+        return { class: cls, section: sec };
+    }, [selectedClassSection]);
 
     const assignedStudents = useMemo(() => {
-        if (!classInfo) return [];
-        return users.filter(u => u.role === 'Student' && u.class === classInfo.class && u.section === classInfo.section);
-    }, [users, classInfo]);
+        if (!currentClassInfo) return [];
+        return users.filter(u => u.role === 'Student' && u.class === currentClassInfo.class && u.section === currentClassInfo.section);
+    }, [users, currentClassInfo]);
 
-    const [studentStatuses, setStudentStatuses] = useState<{ [key: string]: 'P' | 'A' | '' }>(() => {
+    const [studentStatuses, setStudentStatuses] = useState<{ [key: string]: 'P' | 'A' | '' }>({});
+
+    useEffect(() => {
         const initialStatuses: { [key: string]: 'P' | 'A' | '' } = {};
         assignedStudents.forEach(student => {
             const record = attendance.find(a => a.student_qr_id === student.qr_id && a.date === selectedDate);
             initialStatuses[student.qr_id] = record ? record.status : '';
         });
-        return initialStatuses;
-    });
-
-    React.useEffect(() => {
-        const newStatuses: { [key: string]: 'P' | 'A' | '' } = {};
-        assignedStudents.forEach(student => {
-            const record = attendance.find(a => a.student_qr_id === student.qr_id && a.date === selectedDate);
-            newStatuses[student.qr_id] = record ? record.status : '';
-        });
-        setStudentStatuses(newStatuses);
+        setStudentStatuses(initialStatuses);
     }, [selectedDate, attendance, assignedStudents]);
     
-
     const handleStatusChange = (qr_id: string, status: 'P' | 'A' | '') => {
         setStudentStatuses(prev => ({ ...prev, [qr_id]: status }));
     };
 
-    const handleSaveAttendance = async () => {
-        if (!loggedInUser || !classInfo) return showAlert('Cannot save attendance: teacher or class info missing.', 'Error');
+    const handleSaveAttendance = () => {
+        if (!loggedInUser || !currentClassInfo) return showAlert('Cannot save attendance: teacher or class info missing.', 'Error');
         
         const recordsToSave = Object.entries(studentStatuses)
             .filter(([, status]) => status !== '')
@@ -49,10 +58,10 @@ const TeacherAttendance: React.FC = () => {
                     student_qr_id: qr_id,
                     student_name: student?.name || 'Unknown',
                     date: selectedDate,
-                    status: status as 'P' | 'A',
+                    status,
                     teacher_id: loggedInUser.qr_id,
-                    class: classInfo.class,
-                    section: classInfo.section,
+                    class: currentClassInfo.class,
+                    section: currentClassInfo.section,
                 } as AttendanceRecord;
             });
 
@@ -60,24 +69,30 @@ const TeacherAttendance: React.FC = () => {
             return showAlert('No attendance status selected to save.', 'Info', false);
         }
 
-        try {
-            await saveAttendance(recordsToSave);
-            showAlert(`Attendance saved for ${recordsToSave.length} students on ${selectedDate}.`, 'Success', false);
-        } catch (error) {
-            console.error("Error saving attendance: ", error);
-            showAlert("Failed to save attendance. Please try again.", "Database Error");
-        }
+        setAttendance(prev => {
+            const otherRecords = prev.filter(a => !(recordsToSave.some(r => r.id === a.id)));
+            return [...otherRecords, ...recordsToSave];
+        });
+
+        showAlert(`Attendance saved for ${recordsToSave.length} students on ${selectedDate}.`, 'Success', false);
     };
 
-
-    if (!classInfo) {
-        return <div className="p-6 bg-red-100 text-red-700 rounded-xl">Error: You are not assigned a class. Please contact Admin.</div>;
+    if (assignedClassSections.length === 0) {
+        return <div className="p-6 bg-red-100 text-red-700 rounded-xl">Error: You are not assigned any classes. Please contact Admin.</div>;
     }
 
     return (
         <div className="p-6 bg-white dark:bg-gray-700 rounded-xl shadow-lg">
-            <h3 className="text-xl font-bold text-green-600 dark:text-green-400 mb-4">Mark Attendance for Class {classInfo.class}-{classInfo.section}</h3>
+            <h3 className="text-xl font-bold text-green-600 dark:text-green-400 mb-4">Mark Attendance</h3>
             <div className="flex flex-wrap gap-4 items-center mb-4 border-b dark:border-gray-600 pb-4">
+                {assignedClassSections.length > 1 && (
+                    <>
+                        <label className="font-medium text-gray-700 dark:text-gray-300">Class:</label>
+                        <select value={selectedClassSection} onChange={e => setSelectedClassSection(e.target.value)} className="p-2 border rounded-md bg-gray-50 dark:bg-gray-600 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100">
+                           {assignedClassSections.map(cs => <option key={`${cs.class}-${cs.section}`} value={`${cs.class}-${cs.section}`}>{cs.class}-{cs.section}</option>)}
+                        </select>
+                    </>
+                )}
                 <label className="font-medium text-gray-700 dark:text-gray-300">Date:</label>
                 <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="p-2 border rounded-md bg-gray-50 dark:bg-gray-600 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 dark:[color-scheme:dark]" />
                 <button onClick={handleSaveAttendance} className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition">Save Attendance</button>

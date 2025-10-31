@@ -1,19 +1,31 @@
+
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import FeesSetup from './FeesSetup';
 import FeeCollection from './FeeCollection';
 import UserManagement from './UserManagement';
 import QrGenerator from './QrGenerator';
+import ClassManagement from './ClassManagement';
+import AcademicSetup from './AcademicSetup';
+import TimetableManagement from './TimetableManagement';
+import DiscountAssignment from './DiscountAssignment';
+import Reports from './Reports';
 
-type AdminView = 'dashboard' | 'fees' | 'collection' | 'users' | 'qr';
+
+type AdminView = 'dashboard' | 'fees' | 'collection' | 'users' | 'classes' | 'qr' | 'academic' | 'timetable' | 'discount_assignment' | 'reports';
 
 const AdminNav: React.FC<{ activeView: AdminView, setActiveView: (view: AdminView) => void }> = ({ activeView, setActiveView }) => {
     const { navigate } = useAppContext();
     const navItems: { view: AdminView; icon: string; label: string }[] = [
         { view: 'fees', icon: 'fas fa-wallet', label: 'Fees Setup' },
-        { view: 'collection', icon: 'fas fa-receipt', label: 'Fee Collection (QR)' },
+        { view: 'collection', icon: 'fas fa-receipt', label: 'Fee Collection' },
         { view: 'users', icon: 'fas fa-users-cog', label: 'User Management' },
-        { view: 'qr', icon: 'fas fa-id-card-clip', label: 'Generate QR ID Card' },
+        { view: 'discount_assignment', icon: 'fas fa-tags', label: 'Discount Assignment' },
+        { view: 'classes', icon: 'fas fa-school', label: 'Class Management' },
+        { view: 'academic', icon: 'fas fa-book-reader', label: 'Academic Setup' },
+        { view: 'timetable', icon: 'fas fa-calendar-alt', label: 'Timetable Mgt.' },
+        { view: 'qr', icon: 'fas fa-id-card-clip', label: 'Generate QR IDs' },
+        { view: 'reports', icon: 'fas fa-chart-pie', label: 'Reports' },
     ];
     
     const baseClasses = "p-3 rounded-lg text-sm font-medium transition";
@@ -36,9 +48,8 @@ const AdminNav: React.FC<{ activeView: AdminView, setActiveView: (view: AdminVie
 
 
 const DashboardHome: React.FC = () => {
-    const { users, feeStructure } = useAppContext();
+    const { users, feeHeads } = useAppContext();
     const studentCount = users.filter(u => u.role === 'Student').length;
-    const totalAnnualFee = feeStructure ? feeStructure.annual_tuition + feeStructure.library_fee + feeStructure.sports_fee : 0;
 
     return (
         <>
@@ -59,8 +70,8 @@ const DashboardHome: React.FC = () => {
                 </div>
                 <div className="p-4 bg-white dark:bg-gray-700 rounded-lg shadow">
                     <i className="fas fa-money-bill-wave text-yellow-500 text-2xl mb-2"></i>
-                    <p className="font-bold text-lg dark:text-gray-100">₹{totalAnnualFee.toLocaleString('en-IN')}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Annual Fee</p>
+                    <p className="font-bold text-lg dark:text-gray-100">{feeHeads.length}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Fee Heads Configured</p>
                 </div>
             </div>
         </>
@@ -75,7 +86,12 @@ const AdminDashboard: React.FC = () => {
             case 'fees': return <FeesSetup />;
             case 'collection': return <FeeCollection />;
             case 'users': return <UserManagement />;
+            case 'discount_assignment': return <DiscountAssignment />;
+            case 'classes': return <ClassManagement />;
+            case 'academic': return <AcademicSetup />;
+            case 'timetable': return <TimetableManagement />;
             case 'qr': return <QrGenerator />;
+            case 'reports': return <Reports />;
             case 'dashboard':
             default: return <DashboardHome />;
         }

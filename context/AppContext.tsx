@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { User, FeeStructure, Transaction, AttendanceRecord } from '../types';
-import { db } from '../services/firebase';
-import { collection, onSnapshot, doc, addDoc, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
+
+
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { User, FeeHead, ClassFeeStructure, Transaction, AttendanceRecord, Subject, TeacherSubject, TimetableSlot, Exam, StudentMark, DiscountCategory, AdditionalFee, Homework, LateFeeRule, TransportRoute, FeeWaiver } from '../types';
+import { initialUsers, initialFeeHeads, initialClassFeeStructures, initialTransactions, initialAttendance, initialClasses, initialSubjects, initialTeacherSubjects, initialTimetable, initialExams, initialStudentMarks, initialDiscountCategories, initialAdditionalFees, initialHomework, initialLateFeeRule, initialTransportRoutes, initialFeeWaivers } from '../services/mockDb';
 
 type View = 'home' | 'admin_login' | 'admin_dashboard' | 'teacher_login' | 'student_login' | 'teacher_dashboard' | 'student_dashboard';
 type Theme = 'light' | 'dark';
@@ -13,6 +14,15 @@ interface AlertState {
     isError: boolean;
 }
 
+// Read the initial theme that was set by the inline script in index.html
+const getInitialTheme = (): Theme => {
+    if (typeof window !== 'undefined') {
+        return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
+    return 'light';
+};
+
+
 interface AppContextType {
     currentView: View;
     navigate: (view: View) => void;
@@ -23,18 +33,43 @@ interface AppContextType {
     hideAlert: () => void;
     theme: Theme;
     toggleTheme: () => void;
-    // Data stores (now from Firestore)
+    // Data stores
     users: User[];
-    feeStructure: FeeStructure | null;
+    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+    feeHeads: FeeHead[];
+    setFeeHeads: React.Dispatch<React.SetStateAction<FeeHead[]>>;
+    classFeeStructures: ClassFeeStructure[];
+    setClassFeeStructures: React.Dispatch<React.SetStateAction<ClassFeeStructure[]>>;
     transactions: Transaction[];
+    setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+    additionalFees: AdditionalFee[];
+    setAdditionalFees: React.Dispatch<React.SetStateAction<AdditionalFee[]>>;
     attendance: AttendanceRecord[];
-    // Data mutation functions
-    addUser: (userData: Omit<User, 'id'>) => Promise<void>;
-    addBulkUsers: (usersData: Omit<User, 'id'>[]) => Promise<void>;
-    deleteUser: (userId: string) => Promise<void>;
-    addTransaction: (transData: Omit<Transaction, 'id'>) => Promise<void>;
-    saveFeeStructure: (feeData: FeeStructure) => Promise<void>;
-    saveAttendance: (records: AttendanceRecord[]) => Promise<void>;
+    setAttendance: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
+    classes: string[];
+    setClasses: React.Dispatch<React.SetStateAction<string[]>>;
+    // New academic data
+    subjects: Subject[];
+    setSubjects: React.Dispatch<React.SetStateAction<Subject[]>>;
+    teacherSubjects: TeacherSubject[];
+    setTeacherSubjects: React.Dispatch<React.SetStateAction<TeacherSubject[]>>;
+    timetable: TimetableSlot[];
+    setTimetable: React.Dispatch<React.SetStateAction<TimetableSlot[]>>;
+    exams: Exam[];
+    setExams: React.Dispatch<React.SetStateAction<Exam[]>>;
+    studentMarks: StudentMark[];
+    setStudentMarks: React.Dispatch<React.SetStateAction<StudentMark[]>>;
+    discountCategories: DiscountCategory[];
+    setDiscountCategories: React.Dispatch<React.SetStateAction<DiscountCategory[]>>;
+    homework: Homework[];
+    setHomework: React.Dispatch<React.SetStateAction<Homework[]>>;
+    // New financial data
+    lateFeeRule: LateFeeRule;
+    setLateFeeRule: React.Dispatch<React.SetStateAction<LateFeeRule>>;
+    transportRoutes: TransportRoute[];
+    setTransportRoutes: React.Dispatch<React.SetStateAction<TransportRoute[]>>;
+    feeWaivers: FeeWaiver[];
+    setFeeWaivers: React.Dispatch<React.SetStateAction<FeeWaiver[]>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -43,76 +78,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [currentView, setCurrentView] = useState<View>('home');
     const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
     const [alert, setAlert] = useState<AlertState>({ show: false, message: '', title: '', isError: true });
-    const [theme, setTheme] = useState<Theme>('light');
+    const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
-    // Live DB State
-    const [users, setUsers] = useState<User[]>([]);
-    const [feeStructure, setFeeStructure] = useState<FeeStructure | null>(null);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+    // Mock DB State
+    const [users, setUsers] = useState<User[]>(initialUsers);
+    const [feeHeads, setFeeHeads] = useState<FeeHead[]>(initialFeeHeads);
+    const [classFeeStructures, setClassFeeStructures] = useState<ClassFeeStructure[]>(initialClassFeeStructures);
+    const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+    const [additionalFees, setAdditionalFees] = useState<AdditionalFee[]>(initialAdditionalFees);
+    const [attendance, setAttendance] = useState<AttendanceRecord[]>(initialAttendance);
+    const [classes, setClasses] = useState<string[]>(initialClasses);
+    const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
+    const [teacherSubjects, setTeacherSubjects] = useState<TeacherSubject[]>(initialTeacherSubjects);
+    const [timetable, setTimetable] = useState<TimetableSlot[]>(initialTimetable);
+    const [exams, setExams] = useState<Exam[]>(initialExams);
+    const [studentMarks, setStudentMarks] = useState<StudentMark[]>(initialStudentMarks);
+    const [discountCategories, setDiscountCategories] = useState<DiscountCategory[]>(initialDiscountCategories);
+    const [homework, setHomework] = useState<Homework[]>(initialHomework);
+    const [lateFeeRule, setLateFeeRule] = useState<LateFeeRule>(initialLateFeeRule);
+    const [transportRoutes, setTransportRoutes] = useState<TransportRoute[]>(initialTransportRoutes);
+    const [feeWaivers, setFeeWaivers] = useState<FeeWaiver[]>(initialFeeWaivers);
     
-    // Theme management effect
-    useEffect(() => {
-        const storedTheme = localStorage.getItem('theme') as Theme | null;
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (storedTheme) {
-            setTheme(storedTheme);
-        } else if (prefersDark) {
-            setTheme('dark');
-        }
-    }, []);
-
-    useEffect(() => {
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        }
-    }, [theme]);
-    
-    // Firebase real-time listeners effect
-    useEffect(() => {
-        console.log("Setting up Firestore listeners...");
-
-        const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-            const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setUsers(usersData);
-        });
-
-        const unsubTransactions = onSnapshot(collection(db, 'transactions'), (snapshot) => {
-            const transData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-            setTransactions(transData);
-        });
-
-        const unsubAttendance = onSnapshot(collection(db, 'attendance'), (snapshot) => {
-            const attData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceRecord));
-            setAttendance(attData);
-        });
-
-        const unsubFees = onSnapshot(doc(db, 'school_data', 'fee_structure'), (doc) => {
-            if (doc.exists()) {
-                setFeeStructure(doc.data() as FeeStructure);
-            } else {
-                console.warn("Fee structure document does not exist!");
-                // Optionally set a default structure if none is found
-                setFeeStructure({ annual_tuition: 0, library_fee: 0, sports_fee: 0 });
-            }
-        });
-
-        // Cleanup listeners on component unmount
-        return () => {
-            unsubUsers();
-            unsubTransactions();
-            unsubAttendance();
-            unsubFees();
-        };
-    }, []);
-
-
     const toggleTheme = () => {
-        setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+        setTheme(prevTheme => {
+            const newTheme = prevTheme === 'light' ? 'dark' : 'light';
+            if (newTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            }
+            return newTheme;
+        });
     };
 
     const navigate = (view: View) => {
@@ -130,47 +128,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setAlert({ show: false, message: '', title: '', isError: true });
     };
 
-    // --- Firestore Write Operations ---
-    const addUser = async (userData: Omit<User, 'id'>) => {
-        await addDoc(collection(db, 'users'), userData);
-    };
-
-    const addBulkUsers = async (usersData: Omit<User, 'id'>[]) => {
-        const batch = writeBatch(db);
-        const usersCol = collection(db, 'users');
-        usersData.forEach(user => {
-            const docRef = doc(usersCol); // Firestore generates the ID
-            batch.set(docRef, user);
-        });
-        await batch.commit();
-    };
-
-    const deleteUser = async (userId: string) => {
-        await deleteDoc(doc(db, 'users', userId));
-    };
-
-    const addTransaction = async (transData: Omit<Transaction, 'id'>) => {
-        await addDoc(collection(db, 'transactions'), transData);
-    };
-
-    const saveFeeStructure = async (feeData: FeeStructure) => {
-        await setDoc(doc(db, 'school_data', 'fee_structure'), feeData);
-    };
-
-    const saveAttendance = async (records: AttendanceRecord[]) => {
-        const batch = writeBatch(db);
-        const attendanceCol = collection(db, 'attendance');
-        records.forEach(record => {
-            // Use deterministic ID for upserts (update if exists, else create)
-            const docRef = doc(attendanceCol, record.id);
-            // Firestore's set command needs a plain object, without the 'id' field if it's the doc key
-            const { id, ...recordData } = record;
-            batch.set(docRef, recordData);
-        });
-        await batch.commit();
-    };
-
-    const value: AppContextType = {
+    const value = {
         currentView,
         navigate,
         loggedInUser,
@@ -181,15 +139,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         theme,
         toggleTheme,
         users,
-        feeStructure,
+        setUsers,
+        feeHeads,
+        setFeeHeads,
+        classFeeStructures,
+        setClassFeeStructures,
         transactions,
+        setTransactions,
+        additionalFees,
+        setAdditionalFees,
         attendance,
-        addUser,
-        addBulkUsers,
-        deleteUser,
-        addTransaction,
-        saveFeeStructure,
-        saveAttendance
+        setAttendance,
+        classes,
+        setClasses,
+        subjects,
+        setSubjects,
+        teacherSubjects,
+        setTeacherSubjects,
+        timetable,
+        setTimetable,
+        exams,
+        setExams,
+        studentMarks,
+        setStudentMarks,
+        discountCategories,
+        setDiscountCategories,
+        homework,
+        setHomework,
+        lateFeeRule,
+        setLateFeeRule,
+        transportRoutes,
+        setTransportRoutes,
+        feeWaivers,
+        setFeeWaivers,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

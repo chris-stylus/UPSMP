@@ -1,5 +1,8 @@
+
+
 import React, { useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { StudentDetails } from '../../types';
 
 declare const QRCode: any;
 
@@ -39,8 +42,48 @@ const StudentIdCard: React.FC = () => {
                     <span className="text-gray-500 dark:text-gray-400">Class/Section:</span>
                     <span className="font-semibold text-gray-700 dark:text-gray-200">{loggedInUser.class}-{loggedInUser.section}</span>
                 </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Official ID (QR Data):</span>
+                {/* FIX: Check for student role before accessing student-specific details. */}
+                {loggedInUser.details && loggedInUser.role === 'Student' && (() => {
+                    const studentDetails = loggedInUser.details as StudentDetails;
+                    return (
+                        <>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400">Admission No:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{studentDetails.admissionNo}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{studentDetails.status}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400">Date of Birth:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{studentDetails.dob}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400">Father's Name:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{studentDetails.fatherName}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400">Father's Contact:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{studentDetails.fatherContact}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400">Mother's Name:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{studentDetails.motherName}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400">Mother's Contact:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200">{studentDetails.motherContact}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500 dark:text-gray-400 shrink-0 mr-4">Address:</span>
+                                <span className="font-semibold text-gray-700 dark:text-gray-200 text-right">{studentDetails.address}</span>
+                            </div>
+                        </>
+                    );
+                })()}
+                <div className="flex justify-between border-t pt-3 mt-3 border-gray-200 dark:border-gray-600">
+                    <span className="text-gray-500 dark:text-gray-400">QR ID:</span>
                     <span className="font-mono text-lg text-indigo-700 dark:text-indigo-400 font-bold">{loggedInUser.qr_id}</span>
                 </div>
             </div>

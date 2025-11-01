@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { User, StudentDetails } from '../../types';
@@ -25,7 +23,6 @@ const getSessionMonths = () => {
 const calculateStudentFinancials = (student: User, context: any) => {
     const { transactions, feeHeads, classFeeStructures, discountCategories, additionalFees } = context;
 
-    // FIX: Add role check to ensure we only process students with details.
     if (!student.class || !student.details || student.role !== 'Student') return { outstandingBalance: 0, monthlyBreakdown: [] };
     const classFee = classFeeStructures.find((cs: { class: string; }) => cs.class === student.class);
     if (!classFee) return { outstandingBalance: 0, monthlyBreakdown: [] };
@@ -226,7 +223,6 @@ const DiscountSummaryReport = () => {
     
     const summary = useMemo(() => {
         return discountCategories.map(dc => {
-            // FIX: Cast details to StudentDetails to access student-only property.
             const studentsWithDiscount = users.filter(u => u.role === 'Student' && (u.details as StudentDetails)?.discountCategoryIds?.includes(dc.id));
             const studentCount = studentsWithDiscount.length;
 
@@ -370,7 +366,6 @@ const StudentDetailsReport = () => {
                 <tbody className="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
                     {filteredStudents.map(s => (
                         <tr key={s.id}>
-                            {/* FIX: Cast details to StudentDetails to access student-only properties. */}
                             <td className="px-4 py-2">{(s.details as StudentDetails)?.admissionNo}</td>
                             <td className="px-4 py-2 font-medium">{s.name}</td>
                             <td className="px-4 py-2">{s.class}-{s.section}</td>
@@ -529,7 +524,6 @@ const NewAdmissionsReport = () => {
     const newAdmissions = useMemo(() => {
         return users.filter(u => 
             u.role === 'Student' && 
-            // FIX: Cast details to StudentDetails to access student-only property.
             (u.details as StudentDetails)?.status === 'New Student' &&
             (!filterClass || u.class === filterClass)
         );
@@ -554,7 +548,6 @@ const NewAdmissionsReport = () => {
                 <tbody className="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
                     {newAdmissions.map(s => (
                         <tr key={s.id}>
-                            {/* FIX: Cast details to StudentDetails to access student-only property. */}
                             <td className="px-4 py-2">{(s.details as StudentDetails)?.admissionNo}</td>
                             <td className="px-4 py-2 font-medium">{s.name}</td>
                             <td className="px-4 py-2">{s.class}-{s.section}</td>

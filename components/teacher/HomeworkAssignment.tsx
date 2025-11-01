@@ -1,11 +1,10 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Homework } from '../../types';
 
 const HomeworkAssignment: React.FC = () => {
     const { 
-        loggedInUser, teacherSubjects, subjects, homework, setHomework, showAlert 
+        loggedInUser, teacherSubjects, subjects, homework, addHomework, deleteHomework, showAlert 
     } = useAppContext();
 
     const teacherAssignments = useMemo(() => {
@@ -43,13 +42,12 @@ const HomeworkAssignment: React.FC = () => {
             .sort((a, b) => new Date(b.assigned_date).getTime() - new Date(a.assigned_date).getTime());
     }, [loggedInUser, homework]);
 
-    const handleAddAssignment = () => {
+    const handleAddAssignment = async () => {
         if (!loggedInUser || !selectedClassSection || !selectedSubject || !title.trim() || !description.trim() || !dueDate) {
             return showAlert('Please fill all fields to post an assignment.', 'Invalid Input');
         }
         const [cls, sec] = selectedClassSection.split('-');
-        const newAssignment: Homework = {
-            id: `hw-${Date.now()}`,
+        const newAssignment: Omit<Homework, 'id'> = {
             teacher_qr_id: loggedInUser.qr_id,
             class: cls,
             section: sec,
@@ -60,7 +58,7 @@ const HomeworkAssignment: React.FC = () => {
             due_date: dueDate,
         };
 
-        setHomework(prev => [newAssignment, ...prev]);
+        await addHomework(newAssignment);
         showAlert('Homework posted successfully!', 'Success', false);
 
         // Reset form
@@ -69,8 +67,8 @@ const HomeworkAssignment: React.FC = () => {
         setDueDate('');
     };
 
-    const handleDeleteAssignment = (id: string) => {
-        setHomework(prev => prev.filter(hw => hw.id !== id));
+    const handleDeleteAssignment = async (id: string) => {
+        await deleteHomework(id);
         showAlert('Assignment deleted.', 'Success', false);
     };
 

@@ -1,12 +1,12 @@
-
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { TeacherSubject } from '../../types';
 
 const AcademicSetup: React.FC = () => {
     const { 
-        subjects, setSubjects, 
-        exams, setExams,
-        teacherSubjects, setTeacherSubjects,
+        subjects, addSubject, deleteSubject,
+        exams, addExam, deleteExam,
+        teacherSubjects, addTeacherSubject, deleteTeacherSubject,
         showAlert, users, classes 
     } = useAppContext();
 
@@ -21,52 +21,48 @@ const AcademicSetup: React.FC = () => {
     
     const teachers = users.filter(u => u.role === 'Teacher');
 
-    const handleAddSubject = () => {
+    const handleAddSubject = async () => {
         const trimmedName = newSubjectName.trim();
         if (!trimmedName) return showAlert('Subject name is required.');
-        const id = `sub_${trimmedName.toLowerCase().replace(/\s+/g, '_')}`;
-        if (subjects.some(s => s.id === id)) return showAlert('Subject already exists.');
-        setSubjects(prev => [...prev, { id, name: trimmedName }]);
+        if (subjects.some(s => s.name.toLowerCase() === trimmedName.toLowerCase())) return showAlert('Subject already exists.');
+        await addSubject({ name: trimmedName });
         setNewSubjectName('');
         showAlert('Subject added successfully.', 'Success', false);
     };
 
-    const handleDeleteSubject = (id: string) => {
+    const handleDeleteSubject = async (id: string) => {
         if(teacherSubjects.some(ts => ts.subject_id === id)){
             return showAlert('Cannot delete subject. It is assigned to a teacher.', 'Action Blocked');
         }
-        setSubjects(prev => prev.filter(s => s.id !== id));
+        await deleteSubject(id);
         showAlert('Subject deleted.', 'Success', false);
     };
 
-    const handleAddExam = () => {
+    const handleAddExam = async () => {
         const trimmedName = newExamName.trim();
         if (!trimmedName) return showAlert('Exam name is required.');
-        const id = `exam_${trimmedName.toLowerCase().replace(/\s+/g, '_')}`;
-        if (exams.some(e => e.id === id)) return showAlert('Exam already exists.');
-        setExams(prev => [...prev, { id, name: trimmedName }]);
+        if (exams.some(e => e.name.toLowerCase() === trimmedName.toLowerCase())) return showAlert('Exam already exists.');
+        await addExam({ name: trimmedName });
         setNewExamName('');
         showAlert('Exam added successfully.', 'Success', false);
     };
 
-    const handleDeleteExam = (id: string) => {
-        setExams(prev => prev.filter(e => e.id !== id));
+    const handleDeleteExam = async (id: string) => {
+        await deleteExam(id);
         showAlert('Exam deleted.', 'Success', false);
     };
 
-    const handleAssignTeacher = () => {
+    const handleAssignTeacher = async () => {
         if (!selectedTeacher || !selectedSubject || !selectedClass || !assignmentSection) {
             return showAlert('All fields are required for assignment.');
         }
-        const id = `ts_${Date.now()}`;
-        const newAssignment = {
-            id,
+        const newAssignment: Omit<TeacherSubject, 'id'> = {
             teacher_qr_id: selectedTeacher,
             subject_id: selectedSubject,
             class: selectedClass,
             section: assignmentSection.toUpperCase(),
         };
-        setTeacherSubjects(prev => [...prev, newAssignment]);
+        await addTeacherSubject(newAssignment);
         showAlert('Teacher assigned to subject successfully.', 'Success', false);
         // Reset form
         setSelectedTeacher('');
@@ -75,8 +71,8 @@ const AcademicSetup: React.FC = () => {
         setAssignmentSection('');
     };
     
-    const handleDeleteAssignment = (id: string) => {
-        setTeacherSubjects(prev => prev.filter(ts => ts.id !== id));
+    const handleDeleteAssignment = async (id: string) => {
+        await deleteTeacherSubject(id);
         showAlert('Assignment deleted.', 'Success', false);
     };
     

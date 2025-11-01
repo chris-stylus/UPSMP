@@ -1,17 +1,15 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { DiscountCategory, StudentDetails, FeeHead, TransportRoute } from '../../types';
 
 const FeesSetup: React.FC = () => {
     const { 
-        feeHeads, setFeeHeads, 
-        classFeeStructures, setClassFeeStructures, 
+        feeHeads, addFeeHead, deleteFeeHead,
+        classFeeStructures, setClassFeeStructure,
         showAlert, classes,
-        discountCategories, setDiscountCategories,
-        lateFeeRule, setLateFeeRule,
-        transportRoutes, setTransportRoutes,
+        discountCategories, addDiscountCategory, deleteDiscountCategory,
+        lateFeeRule, updateLateFeeRule,
+        transportRoutes, addTransportRoute, deleteTransportRoute,
         users,
     } = useAppContext();
 
@@ -35,6 +33,13 @@ const FeesSetup: React.FC = () => {
     const [newRouteName, setNewRouteName] = useState('');
     const [newRouteFee, setNewRouteFee] = useState('');
 
+    // --- State for Late Fee Rule ---
+    const [editableLateFeeRule, setEditableLateFeeRule] = useState(lateFeeRule);
+    
+    useEffect(() => {
+        setEditableLateFeeRule(lateFeeRule);
+    }, [lateFeeRule]);
+
     useEffect(() => {
         if (!classes.includes(selectedClass) && classes.length > 0) {
             setSelectedClass(classes[0]);
@@ -55,7 +60,7 @@ const FeesSetup: React.FC = () => {
         }
     }, [feeHeads, discountFeeHead]);
 
-    const handleAddHead = () => {
+    const handleAddHead = async () => {
         if (!newHeadName.trim()) {
             return showAlert('Fee head name cannot be empty.', 'Invalid Input');
         }
@@ -63,28 +68,22 @@ const FeesSetup: React.FC = () => {
         if (feeHeads.some(h => h.id === id)) {
             return showAlert('A fee head with a similar name already exists.', 'Error');
         }
-        const newFeeHead: FeeHead = {
-            id,
+        const newFeeHead: Omit<FeeHead, 'id'> = {
             name: newHeadName.trim(),
             feeType: newHeadType,
             ...(newHeadType === 'Annual One-Time' && { dueMonth: newHeadDueMonth })
         };
-        setFeeHeads(prev => [...prev, newFeeHead]);
-        setClassFeeStructures(prev => prev.map(cs => ({ ...cs, fees: { ...cs.fees, [id]: 0 } })));
+        await addFeeHead(newFeeHead);
+        // Note: Class fee structure update will be handled via listener or a separate function if needed.
         setNewHeadName('');
-        showAlert(`Fee Head "${newHeadName.trim()}" added. You can now set its value for each class.`, 'Success', false);
+        showAlert(`Fee Head "${newHeadName.trim()}" added.`, 'Success', false);
     };
 
-    const handleDeleteHead = (idToDelete: string) => {
+    const handleDeleteHead = async (idToDelete: string) => {
         if(discountCategories.some(d => d.type === 'Head-wise' && d.feeHeadId === idToDelete)) {
             return showAlert('Cannot delete fee head as it is being used by a discount category.', 'Action Prevented');
         }
-        setFeeHeads(prev => prev.filter(h => h.id !== idToDelete));
-        setClassFeeStructures(prev => prev.map(cs => {
-            const newFees = { ...cs.fees };
-            delete newFees[idToDelete];
-            return { ...cs, fees: newFees };
-        }));
+        await deleteFeeHead(idToDelete);
         showAlert('Fee Head deleted.', 'Success', false);
     };
 
@@ -92,24 +91,15 @@ const FeesSetup: React.FC = () => {
         setCurrentClassFees(prev => ({ ...prev, [headId]: parseFloat(value) || 0 }));
     };
 
-    const handleSaveClassFees = () => {
+    const handleSaveClassFees = async () => {
         if (!selectedClass) {
             return showAlert('Please select a class to save the fee structure.', 'Action Required');
         }
-        setClassFeeStructures(prev => {
-            const existingIndex = prev.findIndex(cs => cs.class === selectedClass);
-            if (existingIndex > -1) {
-                const updated = [...prev];
-                updated[existingIndex] = { ...updated[existingIndex], fees: currentClassFees };
-                return updated;
-            } else {
-                return [...prev, { class: selectedClass, fees: currentClassFees }];
-            }
-        });
+        await setClassFeeStructure(selectedClass, currentClassFees);
         showAlert(`Fee structure for Class ${selectedClass} has been saved successfully.`, 'Success', false);
     };
 
-    const handleAddDiscount = () => {
+    const handleAddDiscount = async () => {
         if (!newDiscountName.trim() || !discountValue.trim()) {
             return showAlert('Discount name and value are required.', 'Invalid Input');
         }
@@ -121,9 +111,7 @@ const FeesSetup: React.FC = () => {
             return showAlert('Please select a fee head for a head-wise discount.', 'Invalid Input');
         }
 
-        const id = `disc_${Date.now()}`;
-        const newDiscount: DiscountCategory = {
-            id,
+        const newDiscount: Omit<DiscountCategory, 'id'> = {
             name: newDiscountName.trim(),
             type: discountType,
             calculation: discountCalc,
@@ -131,47 +119,46 @@ const FeesSetup: React.FC = () => {
             feeHeadId: discountType === 'Head-wise' ? discountFeeHead : undefined
         };
         
-        setDiscountCategories(prev => [...prev, newDiscount]);
+        await addDiscountCategory(newDiscount);
         showAlert(`Discount category "${newDiscount.name}" added successfully.`, 'Success', false);
         setNewDiscountName('');
         setDiscountValue('');
     };
 
-    const handleDeleteDiscount = (id: string) => {
+    const handleDeleteDiscount = async (id: string) => {
         const isDiscountInUse = users.some(u => u.role === 'Student' && (u.details as StudentDetails)?.discountCategoryIds?.includes(id));
         if (isDiscountInUse) {
             return showAlert('Cannot delete discount category as it is currently assigned to one or more students.', 'Action Prevented');
         }
-        setDiscountCategories(prev => prev.filter(d => d.id !== id));
+        await deleteDiscountCategory(id);
         showAlert('Discount category deleted.', 'Success', false);
     };
     
-    const handleSaveLateFee = () => {
-        setLateFeeRule(current => ({...current})); // Trigger re-render, assuming direct mutation
+    const handleSaveLateFee = async () => {
+        await updateLateFeeRule(editableLateFeeRule);
         showAlert('Late fee rules saved successfully.', 'Success', false);
     }
     
-    const handleAddTransport = () => {
+    const handleAddTransport = async () => {
         if (!newRouteName.trim() || !newRouteFee.trim()) return showAlert('Route name and fee are required.');
         const fee = parseFloat(newRouteFee);
         if (isNaN(fee) || fee < 0) return showAlert('Fee must be a valid number.');
-        const newRoute: TransportRoute = {
-            id: `route_${Date.now()}`,
+        const newRoute: Omit<TransportRoute, 'id'> = {
             name: newRouteName.trim(),
             monthlyFee: fee,
         };
-        setTransportRoutes(prev => [...prev, newRoute]);
+        await addTransportRoute(newRoute);
         setNewRouteName('');
         setNewRouteFee('');
         showAlert('Transport route added.', 'Success', false);
     };
     
-    const handleDeleteTransport = (id: string) => {
+    const handleDeleteTransport = async (id: string) => {
         const isRouteInUse = users.some(u => u.role === 'Student' && (u.details as StudentDetails)?.transportRouteId === id);
         if (isRouteInUse) {
             return showAlert('Cannot delete route as it is assigned to students.', 'Action Prevented');
         }
-        setTransportRoutes(prev => prev.filter(r => r.id !== id));
+        await deleteTransportRoute(id);
         showAlert('Transport route deleted.', 'Success', false);
     };
 
@@ -235,19 +222,19 @@ const FeesSetup: React.FC = () => {
                     <div className="space-y-3">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fee Due Day of Month</label>
-                            <input type="number" value={lateFeeRule.dueDayOfMonth} onChange={e => setLateFeeRule(r => ({...r, dueDayOfMonth: parseInt(e.target.value)}))} min="1" max="28" className="mt-1 block w-full p-2 border rounded-md dark:bg-gray-600" />
+                            <input type="number" value={editableLateFeeRule.dueDayOfMonth} onChange={e => setEditableLateFeeRule(r => ({...r, dueDayOfMonth: parseInt(e.target.value)}))} min="1" max="28" className="mt-1 block w-full p-2 border rounded-md dark:bg-gray-600" />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                            <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Penalty Type</label>
-                                <select value={lateFeeRule.ruleType} onChange={e => setLateFeeRule(r => ({...r, ruleType: e.target.value as any}))} className="mt-1 block w-full p-2 border rounded-md dark:bg-gray-600">
+                                <select value={editableLateFeeRule.ruleType} onChange={e => setEditableLateFeeRule(r => ({...r, ruleType: e.target.value as any}))} className="mt-1 block w-full p-2 border rounded-md dark:bg-gray-600">
                                     <option value="Fixed">Fixed Amount</option>
                                     <option value="Daily">Daily</option>
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Penalty Value (₹)</label>
-                                <input type="number" value={lateFeeRule.value} onChange={e => setLateFeeRule(r => ({...r, value: parseFloat(e.target.value)}))} className="mt-1 block w-full p-2 border rounded-md dark:bg-gray-600" />
+                                <input type="number" value={editableLateFeeRule.value} onChange={e => setEditableLateFeeRule(r => ({...r, value: parseFloat(e.target.value)}))} className="mt-1 block w-full p-2 border rounded-md dark:bg-gray-600" />
                             </div>
                         </div>
                         <button onClick={handleSaveLateFee} className="w-full bg-red-500 text-white p-2 rounded-lg hover:bg-red-600">Save Policy</button>

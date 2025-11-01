@@ -1,10 +1,9 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { DayOfWeek, TimetableSlot } from '../../types';
 
 const TimetableManagement: React.FC = () => {
-    const { classes, teacherSubjects, subjects, users, timetable, setTimetable, showAlert } = useAppContext();
+    const { classes, teacherSubjects, subjects, users, timetable, setTimetableSlot, deleteTimetableSlot, showAlert } = useAppContext();
     const [selectedClass, setSelectedClass] = useState(classes[0] || '');
     const [selectedSection, setSelectedSection] = useState('A');
 
@@ -24,30 +23,22 @@ const TimetableManagement: React.FC = () => {
             });
     }, [selectedClass, selectedSection, teacherSubjects, users, subjects]);
 
-    const handleSlotChange = (day: DayOfWeek, period: number, teacher_subject_id: string) => {
+    const handleSlotChange = async (day: DayOfWeek, period: number, teacher_subject_id: string) => {
         const id = `${selectedClass}-${selectedSection}-${day}-${period}`;
-        const newSlot: TimetableSlot = {
-            id,
-            class: selectedClass,
-            section: selectedSection,
-            day,
-            period,
-            teacher_subject_id,
-        };
-
-        setTimetable(prev => {
-            const existingIndex = prev.findIndex(slot => slot.id === id);
-            if (teacher_subject_id === '') { // If "unassigned" is selected
-                return prev.filter(slot => slot.id !== id);
-            }
-            if (existingIndex > -1) {
-                const updated = [...prev];
-                updated[existingIndex] = newSlot;
-                return updated;
-            } else {
-                return [...prev, newSlot];
-            }
-        });
+        
+        if (teacher_subject_id === '') {
+            await deleteTimetableSlot(id);
+        } else {
+            const newSlot: TimetableSlot = {
+                id,
+                class: selectedClass,
+                section: selectedSection,
+                day,
+                period,
+                teacher_subject_id,
+            };
+            await setTimetableSlot(id, newSlot);
+        }
     };
     
     const getSlotValue = (day: DayOfWeek, period: number) => {

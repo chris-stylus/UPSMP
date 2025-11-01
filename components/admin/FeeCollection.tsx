@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { User, Transaction } from '../../types';
@@ -9,7 +8,7 @@ type FeeCollectionView = 'chooser' | 'scan' | 'search' | 'details' | 'form' | 'd
 type PaymentDetails = { totalDue: number; months: { year: number; month: number }[] };
 
 const FeeCollection: React.FC = () => {
-    const { users, transactions, setTransactions, showAlert } = useAppContext();
+    const { users, transactions, addTransaction, showAlert } = useAppContext();
     const [view, setView] = useState<FeeCollectionView>('chooser');
     const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
     const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
@@ -54,15 +53,14 @@ const FeeCollection: React.FC = () => {
         setView('form');
     };
     
-    const handleRecordPayment = () => {
+    const handleRecordPayment = async () => {
         const amountToRecord = parseFloat(editableAmount);
         if (!selectedStudent || !paymentDetails || isNaN(amountToRecord) || amountToRecord <= 0 || !paymentMethod) {
             showAlert('Please fill all fields and ensure amount is a positive number.', 'Invalid Input');
             return;
         }
 
-        const newTransaction: Transaction = {
-            id: `t${Date.now()}`,
+        const newTransaction: Omit<Transaction, 'id'> = {
             qr_id: selectedStudent.qr_id,
             student_name: selectedStudent.name,
             type: 'Fee Payment',
@@ -72,12 +70,17 @@ const FeeCollection: React.FC = () => {
             months_covered: paymentDetails.months,
         };
 
-        setTransactions(prev => [newTransaction, ...prev]);
-        showAlert(`Payment of ₹${amountToRecord.toLocaleString('en-IN')} recorded for ${selectedStudent.name}.`, 'Success', false);
-        setPaymentDetails(null);
-        setEditableAmount('');
-        setPaymentMethod('');
-        setView('details');
+        try {
+            await addTransaction(newTransaction);
+            showAlert(`Payment of ₹${amountToRecord.toLocaleString('en-IN')} recorded for ${selectedStudent.name}.`, 'Success', false);
+            setPaymentDetails(null);
+            setEditableAmount('');
+            setPaymentMethod('');
+            setView('details');
+        } catch (error) {
+            console.error("Error recording payment: ", error);
+            showAlert('Failed to record payment.', 'Error');
+        }
     };
 
     const resetState = () => {

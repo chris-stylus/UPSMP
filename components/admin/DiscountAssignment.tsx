@@ -1,11 +1,9 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { User, StudentDetails } from '../../types';
 
 const DiscountAssignment: React.FC = () => {
-    const { users, setUsers, classes, discountCategories, showAlert } = useAppContext();
+    const { users, updateUser, classes, discountCategories, showAlert } = useAppContext();
 
     const [selectedDiscountId, setSelectedDiscountId] = useState<string>(discountCategories[0]?.id || '');
     const [selectedClass, setSelectedClass] = useState<string>(classes[0] || '');
@@ -32,7 +30,6 @@ const DiscountAssignment: React.FC = () => {
 
         const initialAssignments: { [studentQrId: string]: boolean } = {};
         filteredStudents.forEach(student => {
-            // FIX: Cast student.details to StudentDetails to access discountCategoryIds.
             initialAssignments[student.qr_id] = (student.details as StudentDetails)?.discountCategoryIds?.includes(selectedDiscountId) || false;
         });
         setStudentAssignments(initialAssignments);
@@ -45,50 +42,43 @@ const DiscountAssignment: React.FC = () => {
         }));
     };
 
-    const handleSaveChanges = () => {
+    const handleSaveChanges = async () => {
         if (!selectedDiscountId) {
             showAlert('Please select a discount category to assign.', 'Action Required');
             return;
         }
 
-        const updatedUsers = users.map(user => {
-            if (user.role !== 'Student' || !user.details) return user;
+        const updatePromises: Promise<void>[] = [];
 
-            // Check if this user is within the scope of our current filtered view
-            const isUserInScope = filteredStudents.some(fs => fs.id === user.id);
+        filteredStudents.forEach(student => {
+            if (student.role !== 'Student' || !student.details) return;
 
-            if (isUserInScope) {
-                 const shouldBeAssigned = studentAssignments[user.qr_id];
-                 // FIX: Cast user.details to StudentDetails to access discountCategoryIds.
-                 const currentDiscounts = (user.details as StudentDetails).discountCategoryIds || [];
-                 const hasDiscount = currentDiscounts.includes(selectedDiscountId);
+            const shouldBeAssigned = studentAssignments[student.qr_id];
+            const studentDetails = student.details as StudentDetails;
+            const currentDiscounts = studentDetails.discountCategoryIds || [];
+            const hasDiscount = currentDiscounts.includes(selectedDiscountId);
 
-                if (shouldBeAssigned && !hasDiscount) {
-                    // Add discount
-                    return {
-                        ...user,
-                        details: {
-                            ...user.details,
-                            discountCategoryIds: [...currentDiscounts, selectedDiscountId],
-                        }
-                    };
-                } else if (!shouldBeAssigned && hasDiscount) {
-                    // Remove discount
-                    return {
-                        ...user,
-                        details: {
-                            ...user.details,
-                            discountCategoryIds: currentDiscounts.filter(id => id !== selectedDiscountId),
-                        }
-                    };
-                }
+            if (shouldBeAssigned && !hasDiscount) {
+                const newDiscounts = [...currentDiscounts, selectedDiscountId];
+                updatePromises.push(updateUser(student.id, { details: { ...studentDetails, discountCategoryIds: newDiscounts } }));
+            } else if (!shouldBeAssigned && hasDiscount) {
+                const newDiscounts = currentDiscounts.filter(id => id !== selectedDiscountId);
+                updatePromises.push(updateUser(student.id, { details: { ...studentDetails, discountCategoryIds: newDiscounts } }));
             }
-            return user; // Return unchanged user
         });
 
-        setUsers(updatedUsers);
-        const discountName = discountCategories.find(d => d.id === selectedDiscountId)?.name;
-        showAlert(`Assignments for "${discountName}" have been updated successfully.`, 'Success', false);
+        if (updatePromises.length > 0) {
+            try {
+                await Promise.all(updatePromises);
+                const discountName = discountCategories.find(d => d.id === selectedDiscountId)?.name;
+                showAlert(`Assignments for "${discountName}" have been updated successfully.`, 'Success', false);
+            } catch (error) {
+                console.error("Error updating discounts:", error);
+                showAlert('Failed to update assignments.', 'Error');
+            }
+        } else {
+            showAlert('No changes to save.', 'Info', false);
+        }
     };
 
     const sortedClasses = [...classes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));

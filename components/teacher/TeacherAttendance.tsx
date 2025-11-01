@@ -1,15 +1,13 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { AttendanceRecord } from '../../types';
 
 const TeacherAttendance: React.FC = () => {
-    const { loggedInUser, users, attendance, setAttendance, showAlert, teacherSubjects } = useAppContext();
+    const { loggedInUser, users, attendance, saveAttendance, showAlert, teacherSubjects } = useAppContext();
     
     const assignedClassSections = useMemo(() => {
         if (!loggedInUser) return [];
         const assignments = teacherSubjects.filter(ts => ts.teacher_qr_id === loggedInUser.qr_id);
-        // Create unique class-section identifiers
         const uniqueClassSections = [...new Set(assignments.map(a => `${a.class}-${a.section}`))];
         return uniqueClassSections.map(cs => {
             const [cls, sec] = cs.split('-');
@@ -46,35 +44,35 @@ const TeacherAttendance: React.FC = () => {
         setStudentStatuses(prev => ({ ...prev, [qr_id]: status }));
     };
 
-    const handleSaveAttendance = () => {
+    const handleSaveAttendance = async () => {
         if (!loggedInUser || !currentClassInfo) return showAlert('Cannot save attendance: teacher or class info missing.', 'Error');
         
-        const recordsToSave = Object.entries(studentStatuses)
+        const recordsToSave: Omit<AttendanceRecord, 'id'>[] = Object.entries(studentStatuses)
             .filter(([, status]) => status !== '')
             .map(([qr_id, status]) => {
                 const student = users.find(u => u.qr_id === qr_id);
                 return {
-                    id: `${qr_id}-${selectedDate}`,
                     student_qr_id: qr_id,
                     student_name: student?.name || 'Unknown',
                     date: selectedDate,
-                    status,
+                    status: status as 'P' | 'A',
                     teacher_id: loggedInUser.qr_id,
                     class: currentClassInfo.class,
                     section: currentClassInfo.section,
-                } as AttendanceRecord;
+                };
             });
 
         if (recordsToSave.length === 0) {
             return showAlert('No attendance status selected to save.', 'Info', false);
         }
 
-        setAttendance(prev => {
-            const otherRecords = prev.filter(a => !(recordsToSave.some(r => r.id === a.id)));
-            return [...otherRecords, ...recordsToSave];
-        });
-
-        showAlert(`Attendance saved for ${recordsToSave.length} students on ${selectedDate}.`, 'Success', false);
+        try {
+            await saveAttendance(recordsToSave);
+            showAlert(`Attendance saved for ${recordsToSave.length} students on ${selectedDate}.`, 'Success', false);
+        } catch (error) {
+            console.error("Error saving attendance:", error);
+            showAlert('Failed to save attendance.', 'Error');
+        }
     };
 
     if (assignedClassSections.length === 0) {

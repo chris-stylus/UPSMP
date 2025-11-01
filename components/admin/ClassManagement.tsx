@@ -1,14 +1,13 @@
-
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 
 const ClassManagement: React.FC = () => {
-    const { classes, setClasses, users, classFeeStructures, showAlert } = useAppContext();
+    const { classes, addClass, deleteClass, users, classFeeStructures, showAlert } = useAppContext();
     const [newClassName, setNewClassName] = useState('');
     
     const sortedClasses = [...classes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    const handleAddClass = () => {
+    const handleAddClass = async () => {
         const trimmedName = newClassName.trim();
         if (!trimmedName) {
             showAlert('Class name cannot be empty.', 'Invalid Input');
@@ -18,18 +17,18 @@ const ClassManagement: React.FC = () => {
             showAlert(`Class "${trimmedName}" already exists.`, 'Duplicate Class');
             return;
         }
-        setClasses(prev => [...prev, trimmedName]);
+        await addClass(trimmedName);
         setNewClassName('');
         showAlert(`Class "${trimmedName}" has been added.`, 'Success', false);
     };
 
-    const handleDeleteClass = (className: string) => {
+    const handleDeleteClass = async (className: string) => {
         const isClassInUse = users.some(u => u.class === className) || classFeeStructures.some(cfs => cfs.class === className);
         if (isClassInUse) {
             showAlert(`Cannot delete Class "${className}" as it's assigned to students or has a fee structure.`, 'Deletion Prevented');
             return;
         }
-        setClasses(prev => prev.filter(c => c !== className));
+        await deleteClass(className);
         showAlert(`Class "${className}" has been deleted.`, 'Success', false);
     };
 
@@ -65,7 +64,7 @@ const ClassManagement: React.FC = () => {
                             </li>
                         ))
                     ) : (
-                        <li className="text-center py-4 text-gray-500 dark:text-gray-400">No classes configured.</li>
+                        <li className="text-center py-4 text-gray-500 dark:text-gray-400">No classes configured. Add one to begin.</li>
                     )}
                 </ul>
             </div>

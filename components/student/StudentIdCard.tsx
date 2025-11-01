@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { StudentDetails } from '../../types';
@@ -42,7 +40,6 @@ const StudentIdCard: React.FC = () => {
                     <span className="text-gray-500 dark:text-gray-400">Class/Section:</span>
                     <span className="font-semibold text-gray-700 dark:text-gray-200">{loggedInUser.class}-{loggedInUser.section}</span>
                 </div>
-                {/* FIX: Check for student role before accessing student-specific details. */}
                 {loggedInUser.details && loggedInUser.role === 'Student' && (() => {
                     const studentDetails = loggedInUser.details as StudentDetails;
                     return (

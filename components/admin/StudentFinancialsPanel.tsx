@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { User, AdditionalFee, StudentDetails, FeeWaiver } from '../../types';
@@ -31,7 +29,7 @@ interface StudentFinancialsPanelProps {
 const StudentFinancialsPanel: React.FC<StudentFinancialsPanelProps> = ({ student, onRecordPayment, onBack }) => {
     const { 
         transactions, feeHeads, classFeeStructures, discountCategories, 
-        additionalFees, lateFeeRule, transportRoutes, feeWaivers, setFeeWaivers, showAlert
+        additionalFees, lateFeeRule, transportRoutes, feeWaivers, addFeeWaiver, showAlert
     } = useAppContext();
 
     const [selectedMonths, setSelectedMonths] = useState<{ [key: string]: boolean }>({});
@@ -175,19 +173,18 @@ const StudentFinancialsPanel: React.FC<StudentFinancialsPanelProps> = ({ student
         onRecordPayment(totalToPay, monthsToPay);
     };
 
-    const handleAddWaiver = () => {
+    const handleAddWaiver = async () => {
         const amount = parseFloat(waiverAmount);
         if (isNaN(amount) || amount <= 0 || !waiverReason.trim()) {
             return showAlert('Please enter a valid amount and reason for the waiver.', 'Invalid Input');
         }
-        const newWaiver: FeeWaiver = {
-            id: `fw_${Date.now()}`,
+        const newWaiver: Omit<FeeWaiver, 'id'> = {
             student_qr_id: student.qr_id,
             amount,
             reason: waiverReason.trim(),
             date: new Date().toISOString(),
         };
-        setFeeWaivers(prev => [...prev, newWaiver]);
+        await addFeeWaiver(newWaiver);
         showAlert('Fee waiver applied successfully.', 'Success', false);
         setWaiverAmount('');
         setWaiverReason('');

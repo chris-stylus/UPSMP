@@ -1,10 +1,9 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { StudentMark } from '../../types';
 
 const EnterMarks: React.FC = () => {
-    const { loggedInUser, teacherSubjects, subjects, exams, users, studentMarks, setStudentMarks, showAlert } = useAppContext();
+    const { loggedInUser, teacherSubjects, subjects, exams, users, studentMarks, saveMarks, showAlert } = useAppContext();
 
     const teacherAssignments = useMemo(() => {
         if (!loggedInUser) return [];
@@ -46,7 +45,7 @@ const EnterMarks: React.FC = () => {
         setMarks(prev => ({ ...prev, [studentId]: value }));
     };
     
-    const handleSaveMarks = () => {
+    const handleSaveMarks = async () => {
         if (!currentAssignment || !selectedExam) return showAlert('Please select an exam and subject.');
 
         const numMaxMarks = parseInt(maxMarks, 10);
@@ -54,34 +53,35 @@ const EnterMarks: React.FC = () => {
             return showAlert('Maximum marks must be a positive number.');
         }
 
-        const newMarks: StudentMark[] = studentsInClass.map(student => {
+        let hasError = false;
+        const newMarks: Omit<StudentMark, 'id'>[] = studentsInClass.map(student => {
             const studentMark = marks[student.qr_id];
-            if (studentMark === '' || studentMark === undefined) return null; // Skip if no mark entered
+            if (studentMark === '' || studentMark === undefined) return null;
             
             const numMark = parseInt(studentMark, 10);
             if(isNaN(numMark) || numMark < 0 || numMark > numMaxMarks){
                 showAlert(`Invalid mark for ${student.name}. Marks must be between 0 and ${numMaxMarks}.`, 'Validation Error');
-                throw new Error('Invalid mark');
+                hasError = true;
+                return null;
             }
 
             return {
-                id: `${student.qr_id}-${selectedExam}-${currentAssignment.subject_id}`,
                 student_qr_id: student.qr_id,
                 exam_id: selectedExam,
                 subject_id: currentAssignment.subject_id,
                 marks: numMark,
                 max_marks: numMaxMarks
             };
-        }).filter((m): m is StudentMark => m !== null);
+        }).filter((m): m is Omit<StudentMark, 'id'> => m !== null);
         
+        if (hasError) return;
+
         try {
-            setStudentMarks(prev => {
-                const otherMarks = prev.filter(m => !newMarks.some(nm => nm.id === m.id));
-                return [...otherMarks, ...newMarks];
-            });
+            await saveMarks(newMarks);
             showAlert(`Marks for ${currentAssignment.subjectName} saved successfully.`, 'Success', false);
-        } catch (error: any) {
-            // Error already shown by showAlert in the loop
+        } catch (error) {
+            console.error("Error saving marks: ", error);
+            showAlert('Failed to save marks.', 'Error');
         }
     };
 

@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 
@@ -15,7 +14,6 @@ const StudentHomework: React.FC = () => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0); // Compare with start of today
                 
-                // Fix: Argument of type 'string' is not assignable to parameter of type '"Due" | "Overdue"'.
                 const status: 'Overdue' | 'Due' = dueDate < today ? 'Overdue' : 'Due';
 
                 return { ...hw, subjectName: subject?.name || 'N/A', status, dueDateObj: dueDate };

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import FeesSetup from './FeesSetup';
@@ -10,9 +11,11 @@ import AcademicSetup from './AcademicSetup';
 import TimetableManagement from './TimetableManagement';
 import DiscountAssignment from './DiscountAssignment';
 import Reports from './Reports';
+import StockManagement from './StockManagement';
+import StockReport from './StockReport';
 
 
-type AdminView = 'dashboard' | 'fees' | 'collection' | 'users' | 'classes' | 'qr' | 'academic' | 'timetable' | 'discount_assignment' | 'reports';
+type AdminView = 'dashboard' | 'fees' | 'collection' | 'users' | 'classes' | 'qr' | 'academic' | 'timetable' | 'discount_assignment' | 'reports' | 'stock' | 'stock_report';
 
 const AdminNav: React.FC<{ activeView: AdminView, setActiveView: (view: AdminView) => void }> = ({ activeView, setActiveView }) => {
     const { navigate } = useAppContext();
@@ -24,6 +27,8 @@ const AdminNav: React.FC<{ activeView: AdminView, setActiveView: (view: AdminVie
         { view: 'classes', icon: 'fas fa-school', label: 'Class Management' },
         { view: 'academic', icon: 'fas fa-book-reader', label: 'Academic Setup' },
         { view: 'timetable', icon: 'fas fa-calendar-alt', label: 'Timetable Mgt.' },
+        { view: 'stock', icon: 'fas fa-boxes', label: 'Stock Mgt.' },
+        { view: 'stock_report', icon: 'fas fa-chart-line', label: 'Stock Report' },
         { view: 'qr', icon: 'fas fa-id-card-clip', label: 'Generate QR IDs' },
         { view: 'reports', icon: 'fas fa-chart-pie', label: 'Reports' },
     ];
@@ -90,6 +95,8 @@ const AdminDashboard: React.FC = () => {
             case 'classes': return <ClassManagement />;
             case 'academic': return <AcademicSetup />;
             case 'timetable': return <TimetableManagement />;
+            case 'stock': return <StockManagement />;
+            case 'stock_report': return <StockReport />;
             case 'qr': return <QrGenerator />;
             case 'reports': return <Reports />;
             case 'dashboard':

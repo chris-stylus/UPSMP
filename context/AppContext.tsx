@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { db } from '../services/firebase';
-import { collection, onSnapshot, doc, addDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { User, FeeHead, ClassFeeStructure, Transaction, AttendanceRecord, Subject, TeacherSubject, TimetableSlot, Exam, StudentMark, DiscountCategory, AdditionalFee, Homework, LateFeeRule, TransportRoute, FeeWaiver } from '../types';
+import { collection, onSnapshot, doc, addDoc, setDoc, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { User, FeeHead, ClassFeeStructure, Transaction, AttendanceRecord, Subject, TeacherSubject, TimetableSlot, Exam, StudentMark, DiscountCategory, AdditionalFee, Homework, LateFeeRule, TransportRoute, FeeWaiver, StockItem, StockActivityLog } from '../types';
 
 type View = 'home' | 'admin_login' | 'admin_dashboard' | 'teacher_login' | 'student_login' | 'teacher_dashboard' | 'student_dashboard';
 type Theme = 'light' | 'dark';
@@ -21,7 +21,7 @@ const getInitialTheme = (): Theme => {
 };
 
 // --- Firestore Data Manipulation Function Types ---
-type AddFunction<T> = (data: Omit<T, 'id'>) => Promise<void>;
+type AddFunction<T> = (data: Omit<T, 'id'>) => Promise<string | undefined>;
 type UpdateFunction<T> = (id: string, data: Partial<T>) => Promise<void>;
 type DeleteFunction = (id: string) => Promise<void>;
 type SetFunction<T> = (id: string, data: T) => Promise<void>;
@@ -56,6 +56,8 @@ interface AppContextType {
     lateFeeRule: LateFeeRule;
     transportRoutes: TransportRoute[];
     feeWaivers: FeeWaiver[];
+    stockItems: StockItem[];
+    stockActivityLogs: StockActivityLog[];
 
     // Data manipulation functions
     addUser: AddFunction<User>;
@@ -86,6 +88,9 @@ interface AppContextType {
     saveMarks: (marks: Omit<StudentMark, 'id'>[]) => Promise<void>;
     addHomework: AddFunction<Homework>;
     deleteHomework: DeleteFunction;
+    addStockItem: AddFunction<StockItem>;
+    updateStockItem: UpdateFunction<StockItem>;
+    deleteStockItem: DeleteFunction;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -114,6 +119,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [lateFeeRule, setLateFeeRule] = useState<LateFeeRule>({ dueDayOfMonth: 15, ruleType: 'Fixed', value: 100 });
     const [transportRoutes, setTransportRoutes] = useState<TransportRoute[]>([]);
     const [feeWaivers, setFeeWaivers] = useState<FeeWaiver[]>([]);
+    const [stockItems, setStockItems] = useState<StockItem[]>([]);
+    const [stockActivityLogs, setStockActivityLogs] = useState<StockActivityLog[]>([]);
 
     useEffect(() => {
         const collections: { name: string; setter: (data: any) => void, idField?: string }[] = [
@@ -133,6 +140,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             { name: 'homework', setter: setHomework },
             { name: 'transportRoutes', setter: setTransportRoutes },
             { name: 'feeWaivers', setter: setFeeWaivers },
+            { name: 'stockItems', setter: setStockItems },
+            { name: 'stockActivityLogs', setter: setStockActivityLogs },
         ];
 
         const unsubscribers = collections.map(({ name, setter, idField }) => 
@@ -169,7 +178,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     // --- Generic Data Manipulation Functions ---
     const createAddFunction = <T extends {}>(collectionName: string): AddFunction<T> => async (data) => {
-        await addDoc(collection(db, collectionName), data);
+        const docRef = await addDoc(collection(db, collectionName), data);
+        return docRef.id;
     };
     const createDeleteFunction = (collectionName: string): DeleteFunction => async (id) => {
         await deleteDoc(doc(db, collectionName, id));
@@ -181,6 +191,71 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await setDoc(doc(db, collectionName, id), data);
     };
 
+    // --- Specific Stock Management with Logging ---
+    const addStockActivityLog = createAddFunction<StockActivityLog>('stockActivityLogs');
+
+    const addStockItemWithLog: AddFunction<StockItem> = async (data) => {
+        const docId = await addDoc(collection(db, 'stockItems'), data);
+        await addStockActivityLog({
+            date: new Date().toISOString(),
+            itemId: docId.id,
+            itemName: data.itemName,
+            class: data.class,
+            type: 'ADD',
+            details: `Initial stock added: ${data.quantity} units.`,
+            quantityChange: data.quantity,
+            valueChange: data.quantity * data.costPrice
+        });
+        return docId.id;
+    };
+
+    const updateStockItemWithLog: UpdateFunction<StockItem> = async (id, data) => {
+        const oldItemDoc = await getDoc(doc(db, 'stockItems', id));
+        if (!oldItemDoc.exists()) throw new Error("Item not found");
+        const oldItem = oldItemDoc.data() as StockItem;
+
+        await setDoc(doc(db, 'stockItems', id), data, { merge: true });
+
+        const updatedData = { ...oldItem, ...data };
+        const changes = [];
+        if (oldItem.quantity !== updatedData.quantity) changes.push(`Qty: ${oldItem.quantity} -> ${updatedData.quantity}`);
+        if (oldItem.costPrice !== updatedData.costPrice) changes.push(`Cost: ${oldItem.costPrice} -> ${updatedData.costPrice}`);
+        if (oldItem.mrp !== updatedData.mrp) changes.push(`MRP: ${oldItem.mrp} -> ${updatedData.mrp}`);
+        if (oldItem.discountPercent !== updatedData.discountPercent) changes.push(`Discount: ${oldItem.discountPercent}% -> ${updatedData.discountPercent}%`);
+
+        if (changes.length > 0) {
+            await addStockActivityLog({
+                date: new Date().toISOString(),
+                itemId: id,
+                itemName: updatedData.itemName,
+                class: updatedData.class,
+                type: 'UPDATE',
+                details: changes.join(', '),
+                quantityChange: updatedData.quantity - oldItem.quantity,
+                valueChange: (updatedData.quantity - oldItem.quantity) * updatedData.costPrice
+            });
+        }
+    };
+    
+    const deleteStockItemWithLog: DeleteFunction = async (id) => {
+        const itemToDeleteDoc = await getDoc(doc(db, 'stockItems', id));
+        if (!itemToDeleteDoc.exists()) return;
+        const itemToDelete = itemToDeleteDoc.data() as StockItem;
+
+        await deleteDoc(doc(db, 'stockItems', id));
+
+        await addStockActivityLog({
+            date: new Date().toISOString(),
+            itemId: id,
+            itemName: itemToDelete.itemName,
+            class: itemToDelete.class,
+            type: 'DELETE',
+            details: 'Item removed from stock.',
+            quantityChange: -itemToDelete.quantity,
+            valueChange: -itemToDelete.quantity * itemToDelete.costPrice
+        });
+    };
+
 
     // --- Context Value ---
     const toggleTheme = () => { setTheme(prev => { const newTheme = prev === 'light' ? 'dark' : 'light'; if (newTheme === 'dark') { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); } else { document.documentElement.classList.remove('dark'); localStorage.setItem('theme', 'light'); } return newTheme; }); };
@@ -190,7 +265,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const value: AppContextType = {
         currentView, navigate, loggedInUser, setLoggedInUser, alert, showAlert, hideAlert, theme, toggleTheme,
-        users, feeHeads, classFeeStructures, transactions, additionalFees, attendance, classes, subjects, teacherSubjects, timetable, exams, studentMarks, discountCategories, homework, lateFeeRule, transportRoutes, feeWaivers,
+        users, feeHeads, classFeeStructures, transactions, additionalFees, attendance, classes, subjects, teacherSubjects, timetable, exams, studentMarks, discountCategories, homework, lateFeeRule, transportRoutes, feeWaivers, stockItems, stockActivityLogs,
 
         // Specific implementations
         addUser: createAddFunction('users'),
@@ -236,6 +311,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         },
         addHomework: createAddFunction('homework'),
         deleteHomework: createDeleteFunction('homework'),
+        addStockItem: addStockItemWithLog,
+        updateStockItem: updateStockItemWithLog,
+        deleteStockItem: deleteStockItemWithLog,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -1,5 +1,6 @@
 
 
+
 export type Role = 'Admin' | 'Teacher' | 'Student';
 
 export interface LateFeeRule {
@@ -163,4 +164,27 @@ export interface Homework {
     description: string;
     assigned_date: string; // ISO string
     due_date: string; // YYYY-MM-DD
+}
+
+export interface StockItem {
+    id: string;
+    itemName: string;
+    class: string;
+    quantity: number;
+    costPrice: number;
+    mrp: number;
+    discountPercent: number;
+    sellingPrice: number;
+}
+
+export interface StockActivityLog {
+    id: string;
+    date: string; // ISO String
+    itemId: string;
+    itemName: string;
+    class: string;
+    type: 'ADD' | 'UPDATE' | 'DELETE';
+    details: string;
+    quantityChange: number;
+    valueChange: number; // Based on cost price
 }
